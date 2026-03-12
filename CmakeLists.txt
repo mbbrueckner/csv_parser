@@ -4,21 +4,21 @@ project(csv_parser VERSION 1.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 1. Header-only Library definieren
+#define header-only libary
 add_library(csv_parser INTERFACE)
 
-# Den Pfad absolut setzen, damit der Compiler ihn sicher findet
+# Set the path to absolute to ensure the compiler can find it reliably
 target_include_directories(csv_parser INTERFACE 
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
-# 2. Catch2 (über Brew installiert) finden
+# find catch 2 v3
 find_package(Catch2 3 REQUIRED)
 
-# 3. Test-Executable
+# add test execuatable 
 add_executable(unit_tests tests/test_main.cpp)
 
-# 4. Verknüpfung: unit_tests nutzt csv_parser und Catch2
+# link unit_tests csv_parser and Catch2
 target_link_libraries(unit_tests 
     PRIVATE 
         csv_parser 
