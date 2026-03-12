@@ -93,3 +93,34 @@ TEST_CASE("fromFile: explicit dTypes mixed schema", "[csv_parser][fromFile]") {
   REQUIRE(std::get<long>(doc.data()[0][1]) == 30);
   REQUIRE(std::get<double>(doc.data()[0][2]) == 1.75);
 }
+
+TEST_CASE("fromFile: separator inside quoted string cell is parsed correctly", "[csv_parser][fromFile]") {
+  {
+    std::ofstream out("quoted_separator.csv");
+    out << "ID;Name;Note\n1;\"Max;Mustermann\";\"Hello;World\"";
+  }
+
+  auto doc = csv::Document::fromFile("quoted_separator.csv", ';');
+
+  REQUIRE(doc.rowCount() == 2);
+  REQUIRE(std::holds_alternative<std::string>(doc.data()[1][1]));
+  REQUIRE(std::holds_alternative<std::string>(doc.data()[1][2]));
+  REQUIRE(std::get<std::string>(doc.data()[1][1]) == "Max;Mustermann");
+  REQUIRE(std::get<std::string>(doc.data()[1][2]) == "Hello;World");
+}
+
+TEST_CASE("toCSV: roundtrip preserves parsed values", "[csv_parser][toCSV]") {
+  {
+    std::ofstream out("roundtrip.csv");
+    out << "Name,Age,Score\nAlice,30,1.5\n\"Bob, Jr.\",25,2.75";
+  }
+
+  auto original = csv::Document::fromFile("roundtrip.csv");
+
+  original.toCSV("roundtrip_out.csv");
+
+  auto reparsed = csv::Document::fromFile("roundtrip_out.csv");
+
+  REQUIRE(reparsed.rowCount() == original.rowCount());
+  REQUIRE(reparsed.data() == original.data());
+}
