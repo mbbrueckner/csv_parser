@@ -2,12 +2,12 @@
 #include <csv_parser.hpp>
 #include <fstream>
 
-TEST_CASE("Namespace und Klasse prüfen", "[csv_parser]") {
+TEST_CASE("check namespace and classes ", "[csv_parser]") {
   csv::Document doc(';');
   REQUIRE(doc.getSeparator() == ';');
 }
 
-TEST_CASE("Factory Methode fromFile", "[csv_parser]") {
+TEST_CASE("Factory method fromFile", "[csv_parser]") {
   {
       std::ofstream out("factory_test.csv");
       out << "ID;Name;Wert\n1;Test;100";
