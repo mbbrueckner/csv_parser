@@ -1,25 +1,129 @@
+/**
+ * @file csv_parser.hpp
+ * @brief Lightweight CSV parsing library with automatic type inference.
+ */
+
 #pragma once
 
 #include <string>
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <variant>
+
 
 namespace csv {
 
 /**
- * @brief A class for reading and writing data in CSV format.
- * 
- * CSV contents are stored as a vector of rows (row = vector of strings).
- * Supports custom CSV separators.
+ * @brief Data type used for a CSV column.
+ */
+enum class DType {
+  STRING, ///< Column contains string values.
+  INT,    ///< Column contains integer values.
+  DOUBLE, ///< Column contains floating-point values.
+  BOOL    ///< Column contains boolean values.
+};
+
+/**
+ * @brief A single CSV cell value; holds one of: empty (monostate), long, double, string, or bool.
+ */
+using CellValue = std::variant<std::monostate, long, double, std::string, bool>;
+
+/**
+ * @brief Represents a parsed CSV document.
+ *
+ * Supports automatic schema inference by sampling the first N rows, or an
+ * explicit column-type schema supplied by the caller.
  */
 class Document {
 private:
-  //! Internal CSV row structure as a 2D string vector.
-  std::vector<std::vector<std::string>> m_rows;
-  
+
+  std::vector<std::vector<CellValue>> m_data;  ///< Parsed rows of typed cell values.
   //! Separator for CSV columns (default = ',').
   char m_separator;
+
+  std::vector<DType> m_schema; ///< Per-column type schema used during parsing.
+
+  /**
+   * @brief Splits a string by a delimiter into a vector of tokens.
+   * @param s   The string to split.
+   * @param sep The delimiter character.
+   * @return Vector of substrings between delimiters.
+   */
+  static std::vector<std::string> split(const std::string& s, char sep) {
+      std::vector<std::string> tokens;
+      std::string token;
+      std::istringstream tokenStream(s);
+      while (std::getline(tokenStream, token, sep)) {
+          tokens.push_back(token);
+      }
+      return tokens;
+  }
+
+  /**
+   * @brief Checks whether a string represents a valid integer.
+   * @param s The string to test.
+   * @return @c true if @p s can be fully parsed as a base-10 integer.
+   */
+  static bool isInteger(const std::string& s) {
+      if (s.empty()) return false;
+      char* p;
+      strtol(s.c_str(), &p, 10);
+      return *p == 0;
+  }
+
+  /**
+   * @brief Checks whether a string represents a valid floating-point number.
+   * @param s The string to test.
+   * @return @c true if @p s can be fully parsed as a double.
+   */
+  static bool isDouble(const std::string& s) {
+      if (s.empty()) return false;
+      char* p;
+      strtod(s.c_str(), &p);
+      return *p == 0;
+  }
+
+  /**
+   * @brief Checks whether a string represents a boolean value.
+   * @param s The string to test (case-insensitive).
+   * @return @c true if @p s is one of: true, false, 1, 0, yes, no.
+   */
+  static bool isBoolean(const std::string& s) {
+    std::string lower = s;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    return (lower == "true" || lower == "false" || lower == "1" || lower == "0" || lower == "yes" || lower == "no");
+  }
+
+  /**
+   * @brief Converts a string to a boolean value.
+   * @param s The string to convert (case-insensitive).
+   * @return @c true if @p s is "true", "1", or "yes"; @c false otherwise.
+   */
+  static bool stringToBool(const std::string& s) {
+    std::string lower = s;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    if (lower == "true" || lower == "1" || lower == "yes") return true;
+    return false;
+  }
+
+  /**
+   * @brief Converts a raw string cell to a typed @ref CellValue.
+   * @param val  The raw string value from the CSV.
+   * @param type The target data type.
+   * @return Typed @ref CellValue, or @c std::monostate for empty/null values,
+   *         or the original string if conversion fails.
+   */
+  CellValue convert(const std::string& val, DType type) {
+      if (val.empty() || val == "NaN" || val == "NULL") return std::monostate{};
+      try {
+          if (type == DType::INT) return std::stol(val);
+          if (type == DType::DOUBLE) return std::stod(val);
+          if (type == DType::BOOL) return stringToBool(val);
+          
+      } catch (...) { return val; } // Fallback to String 
+      return val;
+  }
 
 public:
   /**
@@ -34,21 +138,20 @@ public:
    * @return Number of rows in m_rows.
    */
   size_t rowCount() const {
-  return m_rows.size();
+    return m_data.size();
+  }
+
+  /**
+   * @brief Returns the parsed data as a 2-D grid of typed cell values.
+   * @return Const reference to the internal row/column data.
+   */
+  const std::vector<std::vector<CellValue>>& data() const {
+    return m_data;
   }
 
   /// @brief Returns the current separator.
   char getSeparator() const {
   return m_separator;
-  }
-
-  /**
-   * @brief Direct access to internal CSV data (non-const).
-   * @return Reference to the 2D vector containing all rows.
-   * @warning Modifying this can damage the internal structure.
-   */
-  std::vector<std::vector<std::string>>& data() {
-    return m_rows;
   }
 
   /**
@@ -60,28 +163,67 @@ public:
    * Reads the file line by line and parses it with the given separator.
    * Ignores empty lines and closes the file automatically.
    */
-  static Document fromFile(const std::string& filename, char separator = ',') {
-  Document doc{separator};
-  std::ifstream file{filename};
+ static Document fromFile(const std::string& filename, char sep = ',', size_t sampleRows = 100, std::vector<DType> dTypes = {}) {
+      Document doc(sep);
+      std::ifstream file(filename);
 
-  if (!file.is_open()) {
-    return doc;  // Empty Document on errors
-  }
+      if (!file.is_open()) return doc;
 
-  std::string line;
-  while (std::getline(file, line)) {
-    std::vector<std::string> row;
-    std::stringstream ss(line);
-    std::string cell;
+      std::vector<std::string> lines;
+      std::string line;
 
-    while (std::getline(ss, cell, separator)) {
-      row.push_back(cell);
-    }
-    if (!row.empty()) {
-      doc.m_rows.push_back(row);
-    }
-  }
-  return doc;
+      //  Sampling first N rows
+      while (lines.size() < sampleRows && std::getline(file, line)) {
+        if (!line.empty()) lines.push_back(line);
+      }
+
+      if (lines.empty()) return doc;
+
+      std::vector<std::vector<std::string>> rawSamples;
+      for (const auto& l : lines) rawSamples.push_back(split(l, sep));
+
+      if (!dTypes.empty()) {
+          // use provided schema directly
+          doc.m_schema = dTypes;
+      } else {
+          // vote schema from sample rows
+          size_t numCols = rawSamples[0].size();
+          for (size_t col = 0; col < numCols; ++col) {
+              bool couldBeInt = true;
+              bool couldBeDouble = true;
+              bool couldBeBool = true;
+              for (const auto& row : rawSamples) {
+                  if (col >= row.size() || row[col].empty()) continue;
+                  if (!isInteger(row[col])) couldBeInt = false;
+                  if (!isDouble(row[col])) couldBeDouble = false;
+                  if (!isBoolean(row[col])) couldBeBool= false;
+              }
+              if (couldBeInt) doc.m_schema.push_back(DType::INT);
+              else if (couldBeDouble) doc.m_schema.push_back(DType::DOUBLE);
+              else doc.m_schema.push_back(DType::STRING);
+          }
+      }
+
+      // convert samples
+      for (const auto& rawRow : rawSamples) {
+          std::vector<CellValue> row;
+          for (size_t i = 0; i < doc.m_schema.size(); ++i) {
+              row.push_back(doc.convert(i < rawRow.size() ? rawRow[i] : "", doc.m_schema[i]));
+          }
+          doc.m_data.push_back(row);
+      }
+
+      // read to end 
+      while (std::getline(file, line)) {
+          auto rawRow = split(line, sep);
+          std::vector<CellValue> row;
+          for (size_t i = 0; i < doc.m_schema.size(); ++i) {
+              row.push_back(doc.convert(i < rawRow.size() ? rawRow[i] : "", doc.m_schema[i]));
+          }
+          doc.m_data.push_back(row);
+      }
+
+      return doc;
   }
 };  // class Document
 
