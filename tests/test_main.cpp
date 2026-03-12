@@ -109,7 +109,7 @@ TEST_CASE("fromFile: separator inside quoted string cell is parsed correctly", "
   REQUIRE(std::get<std::string>(doc.data()[1][2]) == "Hello;World");
 }
 
-TEST_CASE("toCSV: roundtrip preserves parsed values", "[csv_parser][toCSV]") {
+TEST_CASE("toFile: roundtrip preserves parsed values", "[csv_parser][toFile]") {
   {
     std::ofstream out("roundtrip.csv");
     out << "Name,Age,Score\nAlice,30,1.5\n\"Bob, Jr.\",25,2.75";
@@ -117,7 +117,7 @@ TEST_CASE("toCSV: roundtrip preserves parsed values", "[csv_parser][toCSV]") {
 
   auto original = csv::Document::fromFile("roundtrip.csv");
 
-  original.toCSV("roundtrip_out.csv");
+  original.toFile("roundtrip_out.csv");
 
   auto reparsed = csv::Document::fromFile("roundtrip_out.csv");
 

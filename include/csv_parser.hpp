@@ -266,7 +266,7 @@ public:
     return doc;
   }
 
-  void toCSV(const std::string &filename) {
+  void toFile(const std::string &filename) {
     std::ofstream file(filename);
 
     if (!file.is_open())
