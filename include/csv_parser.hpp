@@ -294,18 +294,24 @@ public:
 
     std::vector<std::string> dataLines;
     std::string line;
-    std::vector<std::string> fileHeader;
+
+    auto stripCR = [](std::string &s) {
+      if (!s.empty() && s.back() == '\r')
+        s.pop_back();
+    };
 
     if (!columnNames.empty()) {
       if (hasHeader)
         std::getline(file, line); // skip header row
       doc.m_header = columnNames;
     } else if (hasHeader && std::getline(file, line)) {
+      stripCR(line);
       doc.m_header = split(line, sep);
     }
 
     //  Sampling first N data rows
     while (dataLines.size() < sampleRows && std::getline(file, line)) {
+      stripCR(line);
       if (!line.empty())
         dataLines.push_back(line);
     }
@@ -360,6 +366,9 @@ public:
 
     // read to end
     while (std::getline(file, line)) {
+      stripCR(line);
+      if (line.empty())
+        continue;
       auto rawRow = split(line, sep);
       std::vector<CellValue> row;
       for (size_t i = 0; i < doc.m_schema.size(); ++i) {
@@ -385,17 +394,34 @@ public:
    * @param filename Destination file path. The file is created or truncated.
    *                 Does nothing if the file cannot be opened.
    */
-  void toFile(const std::string &filename) {
+  void toFile(const std::string &filename) const {
     std::ofstream file(filename);
 
     if (!file.is_open())
       return;
 
+    auto writeField = [&](const std::string &s) {
+      if (s.find(m_separator) != std::string::npos ||
+          s.find('"') != std::string::npos ||
+          s.find('\n') != std::string::npos ||
+          s.find('\r') != std::string::npos) {
+        std::string escaped = s;
+        size_t pos = 0;
+        while ((pos = escaped.find('"', pos)) != std::string::npos) {
+          escaped.insert(pos, 1, '"');
+          pos += 2;
+        }
+        file << '"' << escaped << '"';
+      } else {
+        file << s;
+      }
+    };
+
     if (!m_header.empty()) {
       for (size_t c = 0; c < m_header.size(); ++c) {
         if (c > 0)
           file << m_separator;
-        file << m_header[c];
+        writeField(m_header[c]);
       }
       file << '\n';
     }
@@ -414,19 +440,7 @@ public:
               if constexpr (std::is_same_v<T, std::monostate>) {
                 // write nothing (empty cell)
               } else if constexpr (std::is_same_v<T, std::string>) {
-                // quote strings that contain the separator or quotes
-                if (val.find(m_separator) != std::string::npos ||
-                    val.find('"') != std::string::npos) {
-                  std::string escaped = val;
-                  size_t pos = 0;
-                  while ((pos = escaped.find('"', pos)) != std::string::npos) {
-                    escaped.insert(pos, 1, '"'); // double up quotes
-                    pos += 2;
-                  }
-                  file << '"' << escaped << '"';
-                } else {
-                  file << val;
-                }
+                writeField(val);
               } else if constexpr (std::is_same_v<T, bool>) {
                 file << (val ? "true" : "false");
               } else {
