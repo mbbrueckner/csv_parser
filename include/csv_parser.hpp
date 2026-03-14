@@ -210,6 +210,67 @@ private:
   }
 
 public:
+
+
+  /**
+   * @brief A non-owning, read-only view of a single column in the document.
+   *
+   * `ColumnView` is a lightweight proxy that references the document's
+   * internal data grid — it holds no copies of cells. Obtain one via
+   * `Document::operator[]`.
+   *
+   * Supports:
+   * - Random access by row index (`operator[]`).
+   * - Range-based `for` loops via a built-in forward iterator.
+   * - `size()` to query the number of rows.
+   *
+   * @note The `Document` that produced this view must outlive it.
+   */
+  class ColumnView {
+      const std::vector<std::vector<CellValue>>& m_data;
+      size_t m_col;
+  public:
+      /**
+       * @brief Constructs a view over column @p col of @p data.
+       * @param data Reference to the document's 2-D data grid.
+       * @param col  Zero-based column index to project.
+       */
+      ColumnView(const std::vector<std::vector<CellValue>>& data, size_t col)
+          : m_data(data), m_col(col) {}
+
+      /// Returns the number of rows (i.e. the number of cells in this column).
+      size_t size() const { return m_data.size(); }
+
+      /**
+       * @brief Returns the cell at row @p row.
+       * @param row Zero-based row index.
+       * @return Const reference to the `CellValue` at that position.
+       * @throws std::out_of_range if @p row is out of bounds.
+       */
+      const CellValue& operator[](size_t row) const {
+          return m_data.at(row).at(m_col);
+      }
+
+      /**
+       * @brief Forward iterator for range-based `for` loops over column cells.
+       */
+      struct Iterator {
+          const std::vector<std::vector<CellValue>>& data;
+          size_t col, row;
+          /// Dereferences the iterator to the current cell.
+          const CellValue& operator*() const { return data[row][col]; }
+          /// Advances to the next row.
+          Iterator& operator++() { ++row; return *this; }
+          /// Returns `true` while the iterator has not reached the end.
+          bool operator!=(const Iterator& o) const { return row != o.row; }
+      };
+
+      /// Returns an iterator to the first row.
+      Iterator begin() const { return {m_data, m_col, 0}; }
+      /// Returns a past-the-end iterator.
+      Iterator end()   const { return {m_data, m_col, m_data.size()}; }
+  }; // class ColumnView
+
   /**
    * @brief Constructs an empty Document.
    *
@@ -250,6 +311,37 @@ public:
    */
   char getSeparator() const { return m_separator; }
 
+
+  /**
+   * @brief Returns a `ColumnView` for the column with the given header name.
+   *
+   * @param name The column name to look up (case-sensitive).
+   * @return A `ColumnView` referencing that column.
+   * @throws std::out_of_range if @p name is not found in the header.
+   * @pre The document must have been created with a header (via `fromFile`
+   *      with `hasHeader = true`, or via the `columnNames` parameter).
+   */
+  ColumnView operator[](const std::string& name) const {
+      auto it = std::find(m_header.begin(), m_header.end(), name);
+      if (it == m_header.end())
+          throw std::out_of_range("Column not found: " + name);
+      return ColumnView(m_data, std::distance(m_header.begin(), it));
+  }
+
+  /**
+   * @brief Returns a `ColumnView` for the column at zero-based index @p col.
+   *
+   * @param col Zero-based column index.
+   * @return A `ColumnView` referencing that column.
+   * @throws std::out_of_range if @p col is >= the number of columns.
+   */
+  ColumnView operator[](size_t col) const {
+      size_t numCols = m_data.empty() ? 0 : m_data[0].size();
+      if (col >= numCols)
+          throw std::out_of_range("Column index out of range");
+      return ColumnView(m_data, col);
+  }
+  
   /**
    * @brief Creates a Document by reading and parsing a CSV file.
    *

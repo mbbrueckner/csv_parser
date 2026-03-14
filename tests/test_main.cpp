@@ -199,7 +199,64 @@ TEST_CASE("toFile: header is written as first line", "[csv_parser][header][toFil
   REQUIRE(reparsed.data() == doc.data());
 }
 
-// ── existing toFile test ──────────────────────────────────────────────────────
+
+TEST_CASE("ColumnView: access column by index", "[csv_parser][ColumnView]") {
+  auto doc = csv::Document::fromFile("schema_mixed.csv", ',', 100,
+      {csv::DType::STRING, csv::DType::INT, csv::DType::DOUBLE});
+
+  auto col = doc[1]; // Age column
+
+  REQUIRE(col.size() == 2);
+  REQUIRE(std::get<long>(col[0]) == 30);
+  REQUIRE(std::get<long>(col[1]) == 25);
+}
+
+TEST_CASE("ColumnView: access column by header name", "[csv_parser][ColumnView]") {
+  {
+    std::ofstream out("cv_named.csv");
+    out << "name,score\nAlice,9.5\nBob,8.0";
+  }
+
+  auto doc = csv::Document::fromFile("cv_named.csv", ',', 100, {}, true);
+
+  auto col = doc["name"];
+
+  REQUIRE(col.size() == 2);
+  REQUIRE(std::get<std::string>(col[0]) == "Alice");
+  REQUIRE(std::get<std::string>(col[1]) == "Bob");
+}
+
+TEST_CASE("ColumnView: range-for iteration", "[csv_parser][ColumnView]") {
+  {
+    std::ofstream out("cv_iter.csv");
+    out << "val\n1\n2\n3";
+  }
+
+  auto doc = csv::Document::fromFile("cv_iter.csv", ',', 100, {}, true);
+
+  std::vector<long> vals;
+  for (const auto& cell : doc["val"])
+    vals.push_back(std::get<long>(cell));
+
+  REQUIRE(vals == std::vector<long>{1, 2, 3});
+}
+
+TEST_CASE("ColumnView: operator[] throws out_of_range for bad row", "[csv_parser][ColumnView]") {
+  auto doc = csv::Document::fromFile("cv_iter.csv", ',', 100, {}, true);
+  auto col = doc[0];
+  REQUIRE_THROWS_AS(col[999], std::out_of_range);
+}
+
+TEST_CASE("ColumnView: operator[](size_t) throws for bad column index", "[csv_parser][ColumnView]") {
+  auto doc = csv::Document::fromFile("cv_iter.csv", ',', 100, {}, true);
+  REQUIRE_THROWS_AS(doc[99], std::out_of_range);
+}
+
+TEST_CASE("ColumnView: operator[](string) throws for unknown column name", "[csv_parser][ColumnView]") {
+  auto doc = csv::Document::fromFile("cv_named.csv", ',', 100, {}, true);
+  REQUIRE_THROWS_AS(doc["nonexistent"], std::out_of_range);
+}
+
 
 TEST_CASE("toFile: roundtrip preserves parsed values", "[csv_parser][toFile]") {
   {
