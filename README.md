@@ -10,6 +10,7 @@ A lightweight, header-only C++17 CSV parsing library with automatic type inferen
 - **Header row support** — read column names from the file or supply them yourself
 - **RFC-4180 quoting** — fields containing the separator or `"` are handled correctly on both read and write
 - **Null/empty cell handling** — empty cells, `NaN`, and `NULL` map to `std::monostate`
+- **Column access** — select a column by name or index via `operator[]`, returning a lazy `ColumnView` with iterator support
 
 ## Requirements
 
@@ -49,6 +50,14 @@ for (const auto &row : doc.data()) {
 
 // Write back to disk (header is preserved)
 doc.toFile("out.csv");
+
+// Access a column by name (requires header)
+for (const auto &cell : doc["score"])
+    std::cout << std::get<double>(cell) << '\n';
+
+// Access a column by zero-based index
+auto first = doc[0];
+std::cout << first.size() << " rows\n";
 ```
 
 ## API reference
@@ -114,6 +123,27 @@ size_t                                    rowCount()    const;
 const std::vector<std::vector<CellValue>> &data()       const;
 const std::vector<std::string>            &columnNames() const;
 char                                       getSeparator() const;
+```
+
+#### `operator[]` — column access
+
+```cpp
+ColumnView operator[](const std::string &name) const;  // by header name
+ColumnView operator[](size_t col)              const;  // by zero-based index
+```
+
+Returns a `ColumnView` — a non-owning, read-only proxy for a single column. Throws `std::out_of_range` if the name or index is invalid.
+
+#### `csv::Document::ColumnView`
+
+A lightweight column proxy. The `Document` must outlive any `ColumnView` obtained from it.
+
+```cpp
+size_t          size()           const;  // number of rows
+const CellValue &operator[](size_t row) const;  // throws on out-of-bounds
+
+// Forward iterator — supports range-based for
+for (const auto &cell : doc["name"]) { ... }
 ```
 
 ## Building and running tests
