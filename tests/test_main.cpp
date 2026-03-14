@@ -37,6 +37,22 @@ TEST_CASE("fromFile: auto schema votes INT for integer column", "[csv_parser][fr
   REQUIRE(std::get<long>(doc.data()[0][0]) == 42);
 }
 
+TEST_CASE("fromFile: auto schema votes BOOL for boolean column", "[csv_parser][fromFile]") {
+  {
+      std::ofstream out("schema_bool.csv");
+      out << "true\nfalse\nyes\nno";
+  }
+
+  auto doc = csv::Document::fromFile("schema_bool.csv");
+
+  REQUIRE(doc.rowCount() == 4);
+  REQUIRE(std::holds_alternative<bool>(doc.data()[0][0]));
+  REQUIRE(std::get<bool>(doc.data()[0][0]) == true);
+  REQUIRE(std::get<bool>(doc.data()[1][0]) == false);
+  REQUIRE(std::get<bool>(doc.data()[2][0]) == true);
+  REQUIRE(std::get<bool>(doc.data()[3][0]) == false);
+}
+
 TEST_CASE("fromFile: auto schema votes DOUBLE for decimal column", "[csv_parser][fromFile]") {
   {
       std::ofstream out("schema_double.csv");
