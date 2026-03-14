@@ -109,6 +109,82 @@ TEST_CASE("fromFile: separator inside quoted string cell is parsed correctly", "
   REQUIRE(std::get<std::string>(doc.data()[1][2]) == "Hello;World");
 }
 
+// ── columnNames / header tests ───────────────────────────────────────────────
+
+TEST_CASE("Document constructor accepts columnNames", "[csv_parser][header]") {
+  csv::Document doc(',', {"id", "name", "score"});
+  REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name", "score"});
+}
+
+TEST_CASE("fromFile: hasHeader reads header row from file", "[csv_parser][header]") {
+  {
+    std::ofstream out("header_read.csv");
+    out << "id,name,score\n1,Alice,9.5\n2,Bob,8.0";
+  }
+
+  auto doc = csv::Document::fromFile("header_read.csv", ',', 100, {}, true);
+
+  REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name", "score"});
+  REQUIRE(doc.rowCount() == 2); // header row not counted as data
+}
+
+TEST_CASE("fromFile: columnNames overrides header row", "[csv_parser][header]") {
+  {
+    std::ofstream out("header_override.csv");
+    out << "a,b,c\n1,2,3";
+  }
+
+  auto doc = csv::Document::fromFile("header_override.csv", ',', 100, {}, true,
+                                     {"x", "y", "z"});
+
+  REQUIRE(doc.columnNames() == std::vector<std::string>{"x", "y", "z"});
+  REQUIRE(doc.rowCount() == 1); // header row still consumed, not in data
+}
+
+TEST_CASE("fromFile: columnNames without hasHeader does not skip first row", "[csv_parser][header]") {
+  {
+    std::ofstream out("header_no_skip.csv");
+    out << "1,Alice\n2,Bob";
+  }
+
+  auto doc = csv::Document::fromFile("header_no_skip.csv", ',', 100, {}, false,
+                                     {"id", "name"});
+
+  REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name"});
+  REQUIRE(doc.rowCount() == 2); // no row skipped
+}
+
+TEST_CASE("fromFile: no header leaves columnNames empty", "[csv_parser][header]") {
+  {
+    std::ofstream out("header_empty.csv");
+    out << "1,2\n3,4";
+  }
+
+  auto doc = csv::Document::fromFile("header_empty.csv");
+
+  REQUIRE(doc.columnNames().empty());
+}
+
+TEST_CASE("toFile: header is written as first line", "[csv_parser][header][toFile]") {
+  {
+    std::ofstream out("header_tofile_in.csv");
+    out << "id,name\n1,Alice\n2,Bob";
+  }
+
+  auto doc = csv::Document::fromFile("header_tofile_in.csv", ',', 100, {}, true);
+  REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name"});
+
+  doc.toFile("header_tofile_out.csv");
+
+  // Re-parse with hasHeader=true and verify header survives the roundtrip
+  auto reparsed = csv::Document::fromFile("header_tofile_out.csv", ',', 100, {}, true);
+  REQUIRE(reparsed.columnNames() == std::vector<std::string>{"id", "name"});
+  REQUIRE(reparsed.rowCount() == doc.rowCount());
+  REQUIRE(reparsed.data() == doc.data());
+}
+
+// ── existing toFile test ──────────────────────────────────────────────────────
+
 TEST_CASE("toFile: roundtrip preserves parsed values", "[csv_parser][toFile]") {
   {
     std::ofstream out("roundtrip.csv");
