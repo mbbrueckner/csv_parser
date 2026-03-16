@@ -593,6 +593,40 @@ void removeRow(size_t row) {
 
     m_data.erase(m_data.begin() + row);
 }
+
+/**
+ * @brief Appends a new column to the document.
+ *
+ * If @p values is empty, all existing rows receive @c std::monostate.
+ * If @p values is non-empty it must contain exactly one entry per
+ * existing row.
+ *
+ * @param name   Column header name (appended to columnNames()).
+ * @param dtype  Type tag for the new column.
+ * @param values Per-row cell values. Defaults to all monostate.
+ * @throws std::invalid_argument if values.size() != rowCount()
+ *         and values is non-empty.
+ */
+void addColumn(const std::string& name,
+               DType dtype,
+               std::vector<CellValue> values = {}) {
+    if (!values.empty() && values.size() != m_data.size())
+        throw std::invalid_argument(
+            "addColumn: values.size() (" + std::to_string(values.size()) +
+            ") != rowCount() (" + std::to_string(m_data.size()) + ")");
+
+    // fill with monostate if no values provided
+    if (values.empty())
+        values.assign(m_data.size(), std::monostate{});
+
+    for (size_t r = 0; r < m_data.size(); ++r)
+        m_data[r].push_back(values[r]);
+
+    m_schema.push_back(dtype);
+
+    if (!m_header.empty())
+        m_header.push_back(name);
+}
 }; // class Document
 
 } // namespace csv
