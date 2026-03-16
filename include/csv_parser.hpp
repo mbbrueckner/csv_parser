@@ -74,11 +74,11 @@ using CellValue = std::variant<std::monostate, long, double, std::string, bool>;
  * @endcode
  */
 struct ParseOptions {
-    char sep                         = ',';   ///< Field delimiter.
-    size_t sampleRows                = 100;   ///< Rows used for type inference.
-    bool hasHeader                   = false; ///< Treat first line as header.
-    std::vector<DType> dTypes        = {};    ///< Explicit schema; skips voting.
-    std::vector<std::string> colNames = {};   ///< Override column names.
+  char sep = ',';                         ///< Field delimiter.
+  size_t sampleRows = 100;                ///< Rows used for type inference.
+  bool hasHeader = false;                 ///< Treat first line as header.
+  std::vector<DType> dTypes = {};         ///< Explicit schema; skips voting.
+  std::vector<std::string> colNames = {}; ///< Override column names.
 };
 
 /**
@@ -184,7 +184,8 @@ private:
   static bool isBoolean(const std::string &s) {
     std::string lower = s;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-    return (lower == "true" || lower == "false" || lower == "yes" || lower == "no");
+    return (lower == "true" || lower == "false" || lower == "yes" ||
+            lower == "no");
   }
 
   /**
@@ -229,8 +230,6 @@ private:
   }
 
 public:
-
-
   /**
    * @brief A non-owning, read-only view of a single column in the document.
    *
@@ -246,44 +245,48 @@ public:
    * @note The `Document` that produced this view must outlive it.
    */
   class ColumnView {
-    const std::vector<std::vector<CellValue>>* m_data; 
+    const std::vector<std::vector<CellValue>> *m_data;
     size_t m_col;
+
   public:
-      /**
-       * @brief Constructs a view over column @p col of @p data.
-       * @param data Reference to the document's 2-D data grid.
-       * @param col  Zero-based column index to project.
-       */
-      ColumnView(const std::vector<std::vector<CellValue>>& data, size_t col)
-          : m_data(&data), m_col(col) {}  
+    /**
+     * @brief Constructs a view over column @p col of @p data.
+     * @param data Reference to the document's 2-D data grid.
+     * @param col  Zero-based column index to project.
+     */
+    ColumnView(const std::vector<std::vector<CellValue>> &data, size_t col)
+        : m_data(&data), m_col(col) {}
 
-      /// Returns the number of rows (i.e. the number of cells in this column).
-      size_t size() const { return m_data->size(); }
+    /// Returns the number of rows (i.e. the number of cells in this column).
+    size_t size() const { return m_data->size(); }
 
-      /**
-       * @brief Returns the cell at row @p row.
-       * @param row Zero-based row index.
-       * @return Const reference to the `CellValue` at that position.
-       * @throws std::out_of_range if @p row is out of bounds.
-       */
-      const CellValue& operator[](size_t row) const {
-          return m_data->at(row).at(m_col);
+    /**
+     * @brief Returns the cell at row @p row.
+     * @param row Zero-based row index.
+     * @return Const reference to the `CellValue` at that position.
+     * @throws std::out_of_range if @p row is out of bounds.
+     */
+    const CellValue &operator[](size_t row) const {
+      return m_data->at(row).at(m_col);
+    }
+
+    /**
+     * @brief Forward iterator for range-based `for` loops over column cells.
+     */
+    struct Iterator {
+      const std::vector<std::vector<CellValue>> *data;
+      size_t col, row;
+      const CellValue &operator*() const { return (*data)[row][col]; }
+      Iterator &operator++() {
+        ++row;
+        return *this;
       }
+      bool operator!=(const Iterator &o) const { return row != o.row; }
+    };
 
-      /**
-       * @brief Forward iterator for range-based `for` loops over column cells.
-       */
-      struct Iterator {
-          const std::vector<std::vector<CellValue>>* data; 
-          size_t col, row;
-          const CellValue& operator*()  const { return (*data)[row][col]; } 
-          Iterator& operator++() { ++row; return *this; }
-          bool operator!=(const Iterator& o) const { return row != o.row; }
-      };
-
-      Iterator begin() const { return {m_data, m_col, 0}; }
-      Iterator end()   const { return {m_data, m_col, m_data->size()}; }
-  }; //class ColumnView
+    Iterator begin() const { return {m_data, m_col, 0}; }
+    Iterator end() const { return {m_data, m_col, m_data->size()}; }
+  }; // class ColumnView
 
   /**
    * @brief Constructs an empty Document.
@@ -292,7 +295,9 @@ public:
    * @param columnNames Optional list of column names stored as the header.
    *                    Can also be supplied later via `fromFile`.
    */
-  explicit Document(char separator = ',', std::vector<std::string> columnNames = {}) : m_separator(separator), m_header(columnNames) {}
+  explicit Document(char separator = ',',
+                    std::vector<std::string> columnNames = {})
+      : m_separator(separator), m_header(columnNames) {}
 
   /**
    * @brief Returns the number of data rows.
@@ -325,7 +330,6 @@ public:
    */
   char getSeparator() const { return m_separator; }
 
-
   /**
    * @brief Returns a `ColumnView` for the column with the given header name.
    *
@@ -335,11 +339,11 @@ public:
    * @pre The document must have been created with a header (via `fromFile`
    *      with `hasHeader = true`, or via the `columnNames` parameter).
    */
-  ColumnView operator[](const std::string& name) const {
-      auto it = std::find(m_header.begin(), m_header.end(), name);
-      if (it == m_header.end())
-          throw std::out_of_range("Column not found: " + name);
-      return ColumnView(m_data, std::distance(m_header.begin(), it));
+  ColumnView operator[](const std::string &name) const {
+    auto it = std::find(m_header.begin(), m_header.end(), name);
+    if (it == m_header.end())
+      throw std::out_of_range("Column not found: " + name);
+    return ColumnView(m_data, std::distance(m_header.begin(), it));
   }
 
   /**
@@ -350,12 +354,12 @@ public:
    * @throws std::out_of_range if @p col is >= the number of columns.
    */
   ColumnView operator[](size_t col) const {
-      size_t numCols = m_data.empty() ? 0 : m_data[0].size();
-      if (col >= numCols)
-          throw std::out_of_range("Column index out of range");
-      return ColumnView(m_data, col);
+    size_t numCols = m_data.empty() ? 0 : m_data[0].size();
+    if (col >= numCols)
+      throw std::out_of_range("Column index out of range");
+    return ColumnView(m_data, col);
   }
-  
+
   /**
    * @brief Creates a Document by reading and parsing a CSV file.
    *
@@ -378,15 +382,18 @@ public:
    *                 sensible defaults; only set what differs from the standard
    *                 case. Relevant fields:
    *                 - `sep`        — field delimiter (default `','`).
-   *                 - `sampleRows` — rows sampled for type inference (default 100).
-   *                 - `dTypes`     — explicit schema; skips voting when non-empty.
+   *                 - `sampleRows` — rows sampled for type inference (default
+   * 100).
+   *                 - `dTypes`     — explicit schema; skips voting when
+   * non-empty.
    *                 - `hasHeader`  — treat first line as header when `true`.
-   *                 - `colNames`   — explicit column names; override file header.
+   *                 - `colNames`   — explicit column names; override file
+   * header.
    * @return         Parsed Document. Returns an empty Document if the file
    *                 cannot be opened or contains no data rows.
    */
-  static Document fromFile( const std::string &filename,
-                            ParseOptions opts = {}) {
+  static Document fromFile(const std::string &filename,
+                           ParseOptions opts = {}) {
     Document doc(opts.sep);
     std::ifstream file(filename);
 
@@ -435,7 +442,8 @@ public:
         bool couldBeDouble = true;
         bool couldBeBool = true;
         for (const auto &row : rawSamples) {
-          if (col >= row.size() || row[col].empty()|| row[col] == "NaN" || row[col] == "NULL")
+          if (col >= row.size() || row[col].empty() || row[col] == "NaN" ||
+              row[col] == "NULL")
             continue;
           if (!isInteger(row[col]))
             couldBeInt = false;
@@ -555,78 +563,112 @@ public:
   }
 
   /**
- * @brief Appends a new row to the document.
- *
- * If @p values contains fewer elements than the number of columns,
- * the missing cells are filled with @c std::monostate.
- *
- * @param values Cell values for the new row.
- * @throws std::invalid_argument if @p values contains more elements
- *         than the number of columns (only when data is non-empty).
- */
+   * @brief Appends a new row to the document.
+   *
+   * If @p values contains fewer elements than the number of columns,
+   * the missing cells are filled with @c std::monostate.
+   *
+   * @param values Cell values for the new row.
+   * @throws std::invalid_argument if @p values contains more elements
+   *         than the number of columns (only when data is non-empty).
+   */
   void addRow(std::vector<CellValue> values) {
-    size_t numCols = m_data.empty() ? values.size()
-                                    : m_data[0].size();
+    size_t numCols = m_data.empty() ? values.size() : m_data[0].size();
 
     if (values.size() > numCols)
-        throw std::invalid_argument(
-            "addRow: too many values (" + std::to_string(values.size()) +
-            ") for " + std::to_string(numCols) + " columns");
+      throw std::invalid_argument("addRow: too many values (" +
+                                  std::to_string(values.size()) + ") for " +
+                                  std::to_string(numCols) + " columns");
 
     // fill missing cells with monostate
     while (values.size() < numCols)
-        values.push_back(std::monostate{});
+      values.push_back(std::monostate{});
 
     m_data.push_back(std::move(values));
-}
-/**
- * @brief Removes the row at zero-based index @p row.
- *
- * @param row Zero-based row index.
- * @throws std::out_of_range if @p row >= rowCount().
- */
-void removeRow(size_t row) {
+  }
+  /**
+   * @brief Removes the row at zero-based index @p row.
+   *
+   * @param row Zero-based row index.
+   * @throws std::out_of_range if @p row >= rowCount().
+   */
+  void removeRow(size_t row) {
     if (row >= m_data.size())
-        throw std::out_of_range(
-            "removeRow: index " + std::to_string(row) +
-            " out of range (rowCount=" + std::to_string(m_data.size()) + ")");
+      throw std::out_of_range(
+          "removeRow: index " + std::to_string(row) +
+          " out of range (rowCount=" + std::to_string(m_data.size()) + ")");
 
     m_data.erase(m_data.begin() + row);
-}
+  }
 
-/**
- * @brief Appends a new column to the document.
- *
- * If @p values is empty, all existing rows receive @c std::monostate.
- * If @p values is non-empty it must contain exactly one entry per
- * existing row.
- *
- * @param name   Column header name (appended to columnNames()).
- * @param dtype  Type tag for the new column.
- * @param values Per-row cell values. Defaults to all monostate.
- * @throws std::invalid_argument if values.size() != rowCount()
- *         and values is non-empty.
- */
-void addColumn(const std::string& name,
-               DType dtype,
-               std::vector<CellValue> values = {}) {
+  /**
+   * @brief Appends a new column to the document.
+   *
+   * If @p values is empty, all existing rows receive @c std::monostate.
+   * If @p values is non-empty it must contain exactly one entry per
+   * existing row.
+   *
+   * @param name   Column header name (appended to columnNames()).
+   * @param dtype  Type tag for the new column.
+   * @param values Per-row cell values. Defaults to all monostate.
+   * @throws std::invalid_argument if values.size() != rowCount()
+   *         and values is non-empty.
+   */
+  void addColumn(const std::string &name, DType dtype,
+                 std::vector<CellValue> values = {}) {
     if (!values.empty() && values.size() != m_data.size())
-        throw std::invalid_argument(
-            "addColumn: values.size() (" + std::to_string(values.size()) +
-            ") != rowCount() (" + std::to_string(m_data.size()) + ")");
+      throw std::invalid_argument(
+          "addColumn: values.size() (" + std::to_string(values.size()) +
+          ") != rowCount() (" + std::to_string(m_data.size()) + ")");
 
     // fill with monostate if no values provided
     if (values.empty())
-        values.assign(m_data.size(), std::monostate{});
+      values.assign(m_data.size(), std::monostate{});
 
     for (size_t r = 0; r < m_data.size(); ++r)
-        m_data[r].push_back(values[r]);
+      m_data[r].push_back(values[r]);
 
     m_schema.push_back(dtype);
 
     if (!m_header.empty())
-        m_header.push_back(name);
-}
-}; // class Document
+      m_header.push_back(name);
+  }
+  /**
+   * @brief Removes the column at zero-based index @p col.
+   *
+   * @param col Zero-based column index.
+   * @throws std::out_of_range if @p col is out of range.
+   */
+  void removeColumn(size_t col) {
+    size_t numCols = m_data.empty() ? m_header.size() : m_data[0].size();
 
+    if (col >= numCols)
+      throw std::out_of_range(
+          "removeColumn: index " + std::to_string(col) +
+          " out of range (columns=" + std::to_string(numCols) + ")");
+
+    for (auto &row : m_data)
+      row.erase(row.begin() + col);
+
+    if (col < m_schema.size())
+      m_schema.erase(m_schema.begin() + col);
+
+    if (col < m_header.size())
+      m_header.erase(m_header.begin() + col);
+  }
+
+  /**
+   * @brief Removes the column with the given header name.
+   *
+   * @param name Column name to remove (case-sensitive).
+   * @throws std::out_of_range if @p name is not found in the header.
+   */
+  void removeColumn(const std::string &name) {
+    auto it = std::find(m_header.begin(), m_header.end(), name);
+    if (it == m_header.end())
+      throw std::out_of_range("removeColumn: column not found: " + name);
+
+    removeColumn(std::distance(m_header.begin(), it));
+  }
+}; // class Document
 } // namespace csv
