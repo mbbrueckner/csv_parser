@@ -289,3 +289,72 @@ TEST_CASE("toFile: roundtrip preserves parsed values", "[csv_parser][toFile]") {
   REQUIRE(reparsed.rowCount() == original.rowCount());
   REQUIRE(reparsed.data() == original.data());
 }
+
+
+TEST_CASE("fromFile: NaN maps to monostate", "[csv_parser][monostate]") {
+    {
+        std::ofstream out("null_nan.csv");
+        out << "value\nNaN\n42";
+    }
+
+    auto doc = csv::Document::fromFile("null_nan.csv", ',', 100, {}, true);
+
+    REQUIRE(doc.rowCount() == 2);
+    REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][0]));
+    REQUIRE(std::holds_alternative<long>(doc.data()[1][0]));
+}
+
+TEST_CASE("fromFile: NULL maps to monostate", "[csv_parser][monostate]") {
+    {
+        std::ofstream out("null_null.csv");
+        out << "value\nNULL\n42";
+    }
+
+    auto doc = csv::Document::fromFile("null_null.csv", ',', 100, {}, true);
+
+    REQUIRE(doc.rowCount() == 2);
+    REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][0]));
+}
+
+TEST_CASE("fromFile: empty cell maps to monostate", "[csv_parser][monostate]") {
+    {
+        std::ofstream out("null_empty_cell.csv");
+        out << "a,b\n1,\n2,3";
+    }
+
+    auto doc = csv::Document::fromFile("null_empty_cell.csv", ',', 100,
+                                       {csv::DType::INT, csv::DType::INT},true);
+
+    REQUIRE(doc.rowCount() == 2);
+    REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][1]));
+    REQUIRE(std::get<long>(doc.data()[1][1]) == 3);
+}
+
+
+TEST_CASE("fromFile: empty lines in file body are skipped", "[csv_parser][whitespace]") {
+    {
+        std::ofstream out("empty_lines.csv");
+        out << "1\n\n2\n\n3";
+    }
+
+    auto doc = csv::Document::fromFile("empty_lines.csv");
+
+    REQUIRE(doc.rowCount() == 3);
+    REQUIRE(std::get<long>(doc.data()[0][0]) == 1);
+    REQUIRE(std::get<long>(doc.data()[1][0]) == 2);
+    REQUIRE(std::get<long>(doc.data()[2][0]) == 3);
+}
+
+TEST_CASE("fromFile: Windows line endings (CRLF) are handled", "[csv_parser][whitespace]") {
+    {
+        std::ofstream out("crlf.csv", std::ios::binary);
+        out << "id,name\r\n1,Alice\r\n2,Bob\r\n";
+    }
+
+    auto doc = csv::Document::fromFile("crlf.csv", ',', 100, {}, true);
+
+    REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name"});
+    REQUIRE(doc.rowCount() == 2);
+    REQUIRE(std::get<std::string>(doc.data()[0][1]) == "Alice");
+    REQUIRE(std::get<std::string>(doc.data()[1][1]) == "Bob");
+}

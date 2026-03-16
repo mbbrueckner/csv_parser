@@ -426,7 +426,7 @@ public:
         bool couldBeDouble = true;
         bool couldBeBool = true;
         for (const auto &row : rawSamples) {
-          if (col >= row.size() || row[col].empty())
+          if (col >= row.size() || row[col].empty()|| row[col] == "NaN" || row[col] == "NULL")
             continue;
           if (!isInteger(row[col]))
             couldBeInt = false;
