@@ -11,7 +11,7 @@
  * ### Quick start
  * @code{.cpp}
  * // Read a file, auto-detect types, treat first row as header
- * auto doc = csv::Document::fromFile("data.csv", ',', 100, {}, true);
+ * auto doc = csv::Document::fromFile("data.csv", {.hasHeader = true});
  *
  * // Access header and data
  * for (const auto &name : doc.columnNames()) { ... }
@@ -60,6 +60,26 @@ enum class DType {
  * - `bool`           — boolean value
  */
 using CellValue = std::variant<std::monostate, long, double, std::string, bool>;
+
+/**
+ * @brief Configuration options for Document::fromFile.
+ *
+ * All fields have sensible defaults so callers only need to specify
+ * what differs from the standard case.
+ *
+ * @code{.cpp}
+ * // Only set what you need:
+ * auto doc = Document::fromFile("data.csv", {.hasHeader = true});
+ * auto doc = Document::fromFile("data.csv", {.sep = ';', .hasHeader = true});
+ * @endcode
+ */
+struct ParseOptions {
+    char sep                         = ',';   ///< Field delimiter.
+    size_t sampleRows                = 100;   ///< Rows used for type inference.
+    bool hasHeader                   = false; ///< Treat first line as header.
+    std::vector<DType> dTypes        = {};    ///< Explicit schema; skips voting.
+    std::vector<std::string> colNames = {};   ///< Override column names.
+};
 
 /**
  * @brief Represents a parsed CSV document.
@@ -358,26 +378,21 @@ public:
    *    as the header.
    * 3. Otherwise no header is set.
    *
-   * @param filename    Path to the CSV file.
-   * @param sep         Field delimiter (default: `','`).
-   * @param sampleRows  Number of rows used for automatic type inference
-   *                    (default: 100). All remaining rows are still read
-   *                    and converted using the inferred schema.
-   * @param dTypes      Explicit per-column type list. When non-empty,
-   *                    schema voting is skipped entirely.
-   * @param hasHeader   When `true`, the first line of the file is treated
-   *                    as a header row and not included in `data()`.
-   * @param columnNames Explicit column names. When non-empty these override
-   *                    the header read from the file.
-   * @return            Parsed Document. Returns an empty Document if the
-   *                    file cannot be opened or contains no data rows.
+   * @param filename Path to the CSV file.
+   * @param opts     Parsing options (see @ref ParseOptions). All fields have
+   *                 sensible defaults; only set what differs from the standard
+   *                 case. Relevant fields:
+   *                 - `sep`        — field delimiter (default `','`).
+   *                 - `sampleRows` — rows sampled for type inference (default 100).
+   *                 - `dTypes`     — explicit schema; skips voting when non-empty.
+   *                 - `hasHeader`  — treat first line as header when `true`.
+   *                 - `colNames`   — explicit column names; override file header.
+   * @return         Parsed Document. Returns an empty Document if the file
+   *                 cannot be opened or contains no data rows.
    */
-  static Document fromFile(const std::string &filename, char sep = ',',
-                           size_t sampleRows = 100,
-                           std::vector<DType> dTypes = {},
-                           const bool hasHeader = false,
-                           std::vector<std::string> columnNames = {}) {
-    Document doc(sep);
+  static Document fromFile( const std::string &filename,
+                            ParseOptions opts = {}) {
+    Document doc(opts.sep);
     std::ifstream file(filename);
 
     if (!file.is_open())
@@ -391,17 +406,17 @@ public:
         s.pop_back();
     };
 
-    if (!columnNames.empty()) {
-      if (hasHeader)
+    if (!opts.colNames.empty()) {
+      if (opts.hasHeader)
         std::getline(file, line); // skip header row
-      doc.m_header = columnNames;
-    } else if (hasHeader && std::getline(file, line)) {
+      doc.m_header = opts.colNames;
+    } else if (opts.hasHeader && std::getline(file, line)) {
       stripCR(line);
-      doc.m_header = split(line, sep);
+      doc.m_header = split(line, opts.sep);
     }
 
     //  Sampling first N data rows
-    while (dataLines.size() < sampleRows && std::getline(file, line)) {
+    while (dataLines.size() < opts.sampleRows && std::getline(file, line)) {
       stripCR(line);
       if (!line.empty())
         dataLines.push_back(line);
@@ -412,11 +427,11 @@ public:
 
     std::vector<std::vector<std::string>> rawSamples;
     for (const auto &l : dataLines)
-      rawSamples.push_back(split(l, sep));
+      rawSamples.push_back(split(l, opts.sep));
 
-    if (!dTypes.empty()) {
+    if (!opts.dTypes.empty()) {
       // use provided schema directly
-      doc.m_schema = dTypes;
+      doc.m_schema = opts.dTypes;
     } else {
       // vote schema from sample rows
       size_t numCols = rawSamples[0].size();
@@ -460,7 +475,7 @@ public:
       stripCR(line);
       if (line.empty())
         continue;
-      auto rawRow = split(line, sep);
+      auto rawRow = split(line, opts.sep);
       std::vector<CellValue> row;
       for (size_t i = 0; i < doc.m_schema.size(); ++i) {
         row.push_back(

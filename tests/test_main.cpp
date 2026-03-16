@@ -13,7 +13,7 @@ TEST_CASE("Factory method fromFile", "[csv_parser]") {
       out << "ID;Name;Wert\n1;Test;100";
   }
 
-  auto doc = csv::Document::fromFile("factory_test.csv", ';');
+  auto doc = csv::Document::fromFile("factory_test.csv", {.sep = ';'});
 
   REQUIRE(doc.rowCount() == 2);
   REQUIRE(doc.data()[1][1] == csv::CellValue{std::string("Test")});
@@ -85,7 +85,7 @@ TEST_CASE("fromFile: explicit dTypes overrides schema voting", "[csv_parser][fro
   }
 
   // Column would be voted as INT, but we force STRING
-  auto doc = csv::Document::fromFile("schema_override.csv", ',', 100, {csv::DType::STRING});
+  auto doc = csv::Document::fromFile("schema_override.csv", {.dTypes = {csv::DType::STRING}});
 
   REQUIRE(doc.rowCount() == 3);
   REQUIRE(std::holds_alternative<std::string>(doc.data()[0][0]));
@@ -98,8 +98,8 @@ TEST_CASE("fromFile: explicit dTypes mixed schema", "[csv_parser][fromFile]") {
       out << "Alice,30,1.75\nBob,25,1.80";
   }
 
-  auto doc = csv::Document::fromFile("schema_mixed.csv", ',', 100,
-      {csv::DType::STRING, csv::DType::INT, csv::DType::DOUBLE});
+  auto doc = csv::Document::fromFile("schema_mixed.csv",
+      {.dTypes = {csv::DType::STRING, csv::DType::INT, csv::DType::DOUBLE}});
 
   REQUIRE(doc.rowCount() == 2);
   REQUIRE(std::holds_alternative<std::string>(doc.data()[0][0]));
@@ -116,7 +116,7 @@ TEST_CASE("fromFile: separator inside quoted string cell is parsed correctly", "
     out << "ID;Name;Note\n1;\"Max;Mustermann\";\"Hello;World\"";
   }
 
-  auto doc = csv::Document::fromFile("quoted_separator.csv", ';');
+  auto doc = csv::Document::fromFile("quoted_separator.csv", {.sep = ';'});
 
   REQUIRE(doc.rowCount() == 2);
   REQUIRE(std::holds_alternative<std::string>(doc.data()[1][1]));
@@ -138,7 +138,7 @@ TEST_CASE("fromFile: hasHeader reads header row from file", "[csv_parser][header
     out << "id,name,score\n1,Alice,9.5\n2,Bob,8.0";
   }
 
-  auto doc = csv::Document::fromFile("header_read.csv", ',', 100, {}, true);
+  auto doc = csv::Document::fromFile("header_read.csv", {.hasHeader = true});
 
   REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name", "score"});
   REQUIRE(doc.rowCount() == 2); // header row not counted as data
@@ -150,8 +150,8 @@ TEST_CASE("fromFile: columnNames overrides header row", "[csv_parser][header]") 
     out << "a,b,c\n1,2,3";
   }
 
-  auto doc = csv::Document::fromFile("header_override.csv", ',', 100, {}, true,
-                                     {"x", "y", "z"});
+  auto doc = csv::Document::fromFile("header_override.csv",
+                                     {.hasHeader = true, .colNames = {"x", "y", "z"}});
 
   REQUIRE(doc.columnNames() == std::vector<std::string>{"x", "y", "z"});
   REQUIRE(doc.rowCount() == 1); // header row still consumed, not in data
@@ -163,8 +163,7 @@ TEST_CASE("fromFile: columnNames without hasHeader does not skip first row", "[c
     out << "1,Alice\n2,Bob";
   }
 
-  auto doc = csv::Document::fromFile("header_no_skip.csv", ',', 100, {}, false,
-                                     {"id", "name"});
+  auto doc = csv::Document::fromFile("header_no_skip.csv", {.colNames = {"id", "name"}});
 
   REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name"});
   REQUIRE(doc.rowCount() == 2); // no row skipped
@@ -187,13 +186,13 @@ TEST_CASE("toFile: header is written as first line", "[csv_parser][header][toFil
     out << "id,name\n1,Alice\n2,Bob";
   }
 
-  auto doc = csv::Document::fromFile("header_tofile_in.csv", ',', 100, {}, true);
+  auto doc = csv::Document::fromFile("header_tofile_in.csv", {.hasHeader = true});
   REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name"});
 
   doc.toFile("header_tofile_out.csv");
 
   // Re-parse with hasHeader=true and verify header survives the roundtrip
-  auto reparsed = csv::Document::fromFile("header_tofile_out.csv", ',', 100, {}, true);
+  auto reparsed = csv::Document::fromFile("header_tofile_out.csv", {.hasHeader = true});
   REQUIRE(reparsed.columnNames() == std::vector<std::string>{"id", "name"});
   REQUIRE(reparsed.rowCount() == doc.rowCount());
   REQUIRE(reparsed.data() == doc.data());
@@ -205,8 +204,8 @@ TEST_CASE("ColumnView: access column by index", "[csv_parser][ColumnView]") {
       std::ofstream out("cv_by_index.csv");
       out << "Alice,30,1.75\nBob,25,1.80";
   }
-  auto doc = csv::Document::fromFile("cv_by_index.csv", ',', 100,
-      {csv::DType::STRING, csv::DType::INT, csv::DType::DOUBLE});
+  auto doc = csv::Document::fromFile("cv_by_index.csv",
+      {.dTypes = {csv::DType::STRING, csv::DType::INT, csv::DType::DOUBLE}});
 
   auto col = doc[1]; // Age column
 
@@ -221,7 +220,7 @@ TEST_CASE("ColumnView: access column by header name", "[csv_parser][ColumnView]"
     out << "name,score\nAlice,9.5\nBob,8.0";
   }
 
-  auto doc = csv::Document::fromFile("cv_named.csv", ',', 100, {}, true);
+  auto doc = csv::Document::fromFile("cv_named.csv", {.hasHeader = true});
 
   auto col = doc["name"];
 
@@ -236,7 +235,7 @@ TEST_CASE("ColumnView: range-for iteration", "[csv_parser][ColumnView]") {
     out << "val\n1\n2\n3";
   }
 
-  auto doc = csv::Document::fromFile("cv_iter.csv", ',', 100, {}, true);
+  auto doc = csv::Document::fromFile("cv_iter.csv", {.hasHeader = true});
 
   std::vector<long> vals;
   for (const auto& cell : doc["val"])
@@ -250,7 +249,7 @@ TEST_CASE("ColumnView: operator[] throws out_of_range for bad row", "[csv_parser
       std::ofstream out("cv_throw_row.csv");
       out << "val\n1\n2\n3";
   }
-  auto doc = csv::Document::fromFile("cv_throw_row.csv", ',', 100, {}, true);
+  auto doc = csv::Document::fromFile("cv_throw_row.csv", {.hasHeader = true});
   auto col = doc[0];
   REQUIRE_THROWS_AS(col[999], std::out_of_range);
 }
@@ -260,7 +259,7 @@ TEST_CASE("ColumnView: operator[](size_t) throws for bad column index", "[csv_pa
       std::ofstream out("cv_throw_col.csv");
       out << "val\n1\n2\n3";
   }
-  auto doc = csv::Document::fromFile("cv_throw_col.csv", ',', 100, {}, true);
+  auto doc = csv::Document::fromFile("cv_throw_col.csv", {.hasHeader = true});
   REQUIRE_THROWS_AS(doc[99], std::out_of_range);
 }
 
@@ -269,7 +268,7 @@ TEST_CASE("ColumnView: operator[](string) throws for unknown column name", "[csv
       std::ofstream out("cv_throw_name.csv");
       out << "name,score\nAlice,9.5\nBob,8.0";
   }
-  auto doc = csv::Document::fromFile("cv_throw_name.csv", ',', 100, {}, true);
+  auto doc = csv::Document::fromFile("cv_throw_name.csv", {.hasHeader = true});
   REQUIRE_THROWS_AS(doc["nonexistent"], std::out_of_range);
 }
 
@@ -297,7 +296,7 @@ TEST_CASE("fromFile: NaN maps to monostate", "[csv_parser][monostate]") {
         out << "value\nNaN\n42";
     }
 
-    auto doc = csv::Document::fromFile("null_nan.csv", ',', 100, {}, true);
+    auto doc = csv::Document::fromFile("null_nan.csv", {.hasHeader = true});
 
     REQUIRE(doc.rowCount() == 2);
     REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][0]));
@@ -310,7 +309,7 @@ TEST_CASE("fromFile: NULL maps to monostate", "[csv_parser][monostate]") {
         out << "value\nNULL\n42";
     }
 
-    auto doc = csv::Document::fromFile("null_null.csv", ',', 100, {}, true);
+    auto doc = csv::Document::fromFile("null_null.csv", {.hasHeader = true});
 
     REQUIRE(doc.rowCount() == 2);
     REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][0]));
@@ -322,8 +321,8 @@ TEST_CASE("fromFile: empty cell maps to monostate", "[csv_parser][monostate]") {
         out << "a,b\n1,\n2,3";
     }
 
-    auto doc = csv::Document::fromFile("null_empty_cell.csv", ',', 100,
-                                       {csv::DType::INT, csv::DType::INT},true);
+    auto doc = csv::Document::fromFile("null_empty_cell.csv",
+                                       {.hasHeader = true, .dTypes = {csv::DType::INT, csv::DType::INT}});
 
     REQUIRE(doc.rowCount() == 2);
     REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][1]));
@@ -351,7 +350,7 @@ TEST_CASE("fromFile: Windows line endings (CRLF) are handled", "[csv_parser][whi
         out << "id,name\r\n1,Alice\r\n2,Bob\r\n";
     }
 
-    auto doc = csv::Document::fromFile("crlf.csv", ',', 100, {}, true);
+    auto doc = csv::Document::fromFile("crlf.csv", {.hasHeader = true});
 
     REQUIRE(doc.columnNames() == std::vector<std::string>{"id", "name"});
     REQUIRE(doc.rowCount() == 2);
