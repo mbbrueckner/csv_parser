@@ -246,8 +246,8 @@ public:
    * @note The `Document` that produced this view must outlive it.
    */
   class ColumnView {
-      const std::vector<std::vector<CellValue>>& m_data;
-      size_t m_col;
+    const std::vector<std::vector<CellValue>>* m_data; 
+    size_t m_col;
   public:
       /**
        * @brief Constructs a view over column @p col of @p data.
@@ -255,10 +255,10 @@ public:
        * @param col  Zero-based column index to project.
        */
       ColumnView(const std::vector<std::vector<CellValue>>& data, size_t col)
-          : m_data(data), m_col(col) {}
+          : m_data(&data), m_col(col) {}  
 
       /// Returns the number of rows (i.e. the number of cells in this column).
-      size_t size() const { return m_data.size(); }
+      size_t size() const { return m_data->size(); }
 
       /**
        * @brief Returns the cell at row @p row.
@@ -267,28 +267,23 @@ public:
        * @throws std::out_of_range if @p row is out of bounds.
        */
       const CellValue& operator[](size_t row) const {
-          return m_data.at(row).at(m_col);
+          return m_data->at(row).at(m_col);
       }
 
       /**
        * @brief Forward iterator for range-based `for` loops over column cells.
        */
       struct Iterator {
-          const std::vector<std::vector<CellValue>>& data;
+          const std::vector<std::vector<CellValue>>* data; 
           size_t col, row;
-          /// Dereferences the iterator to the current cell.
-          const CellValue& operator*() const { return data[row][col]; }
-          /// Advances to the next row.
+          const CellValue& operator*()  const { return (*data)[row][col]; } 
           Iterator& operator++() { ++row; return *this; }
-          /// Returns `true` while the iterator has not reached the end.
           bool operator!=(const Iterator& o) const { return row != o.row; }
       };
 
-      /// Returns an iterator to the first row.
       Iterator begin() const { return {m_data, m_col, 0}; }
-      /// Returns a past-the-end iterator.
-      Iterator end()   const { return {m_data, m_col, m_data.size()}; }
-  }; // class ColumnView
+      Iterator end()   const { return {m_data, m_col, m_data->size()}; }
+  }; //class ColumnView
 
   /**
    * @brief Constructs an empty Document.
