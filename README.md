@@ -1,6 +1,6 @@
 # csv_parser
 
-A lightweight, header-only C++17 CSV parsing library with automatic type inference.
+A lightweight, header-only C++20 CSV parsing library with automatic type inference.
 
 ## Features
 
@@ -11,10 +11,11 @@ A lightweight, header-only C++17 CSV parsing library with automatic type inferen
 - **RFC-4180 quoting** — fields containing the separator or `"` are handled correctly on both read and write
 - **Null/empty cell handling** — empty cells, `NaN`, and `NULL` map to `std::monostate`
 - **Column access** — select a column by name or index via `operator[]`, returning a lazy `ColumnView` with iterator support
+- **Data manipulation** — add or remove rows and columns after loading
 
 ## Requirements
 
-- C++17 or later
+- C++20 or later
 - CMake 3.14+ (for the test suite)
 - [Catch2 v3](https://github.com/catchorg/Catch2) (for the test suite)
 
@@ -34,7 +35,7 @@ Or point your build system at the `include/` directory.
 #include "csv_parser.hpp"
 
 // Read a file — auto-detect types, treat first row as header
-auto doc = csv::Document::fromFile("data.csv", ',', 100, {}, true);
+auto doc = csv::Document::fromFile("data.csv", {.sep = ',', .hasHeader = true});
 
 // Inspect header
 for (const auto &name : doc.columnNames())
@@ -84,27 +85,32 @@ explicit Document(char separator = ',', std::vector<std::string> columnNames = {
 
 Creates an empty document. Mostly used internally; prefer `fromFile` for loading data.
 
+#### `csv::ParseOptions`
+
+```cpp
+struct ParseOptions {
+    char                     sep        = ',';   // field delimiter
+    size_t                   sampleRows = 100;   // rows used for type inference
+    bool                     hasHeader  = false; // treat first line as header
+    std::vector<DType>       dTypes     = {};    // explicit schema; skips voting
+    std::vector<std::string> colNames   = {};    // override column names
+};
+```
+
 #### `fromFile` (static factory)
 
 ```cpp
-static Document fromFile(
-    const std::string        &filename,
-    char                      sep         = ',',
-    size_t                    sampleRows  = 100,
-    std::vector<DType>        dTypes      = {},
-    bool                      hasHeader   = false,
-    std::vector<std::string>  columnNames = {}
-);
+static Document fromFile(const std::string &filename, ParseOptions opts = {});
 ```
 
-| Parameter | Description |
+| Field | Description |
 |---|---|
 | `filename` | Path to the CSV file |
-| `sep` | Field delimiter (default `,`) |
-| `sampleRows` | Rows used for automatic type inference (default 100); all rows are still parsed |
-| `dTypes` | Explicit per-column type list; skips inference when non-empty |
-| `hasHeader` | Treat the first line as a header row (not included in `data()`) |
-| `columnNames` | Override column names; if `hasHeader` is also `true`, the file's header line is consumed and discarded |
+| `opts.sep` | Field delimiter (default `,`) |
+| `opts.sampleRows` | Rows used for automatic type inference (default 100); all rows are still parsed |
+| `opts.dTypes` | Explicit per-column type list; skips inference when non-empty |
+| `opts.hasHeader` | Treat the first line as a header row (not included in `data()`) |
+| `opts.colNames` | Override column names; if `hasHeader` is also `true`, the file's header line is consumed and discarded |
 
 Returns an empty `Document` if the file cannot be opened or contains no data rows.
 
@@ -146,13 +152,77 @@ const CellValue &operator[](size_t row) const;  // throws on out-of-bounds
 for (const auto &cell : doc["name"]) { ... }
 ```
 
+#### Data manipulation
+
+```cpp
+// Append a row (missing cells are filled with std::monostate)
+doc.addRow({1L, 3.14, std::string("hello")});
+
+// Remove the row at zero-based index
+doc.removeRow(2);
+
+// Append a new column (values must match rowCount(), or be empty for all-null)
+doc.addColumn("score", csv::DType::DOUBLE, {1.0, 2.0, 3.0});
+
+// Remove a column by index or by name
+doc.removeColumn(0);
+doc.removeColumn("score");
+```
+
+All four methods throw `std::invalid_argument` or `std::out_of_range` on invalid input.
+
+## Example
+
+The `example/` directory contains a worked example using `grades.csv`:
+
+```
+name,math,english,science
+Alice,85,92,78
+Bob,91,84,95
+Charlie,73,88,82
+Diana,96,79,91
+```
+
+The program ([example/main.cpp](example/main.cpp)):
+
+1. Loads the CSV with a header row
+2. Computes the per-student average across the grade columns
+3. Appends an `average` column with those values
+4. Adds a new student row (`Eve`)
+5. Finds and prints the best-performing student
+6. Writes the result to `grades_out.csv`
+
+Build and run after compiling the project:
+
+```bash
+./example
+```
+
+Expected output:
+
+```
+=== Loaded 4 students ===
+
+Alice → average: 85
+Bob → average: 90
+Charlie → average: 81
+Diana → average: 88.6667
+
+Added student Eve
+
+Best student: Bob (90)
+
+Results written to grades_out.csv
+```
+
 ## Building and running tests
 
 ```bash
 mkdir build && cd build
 cmake ..
 cmake --build .
-./unit_tests
+./unit_tests   # run the test suite
+./example      # run the grades example
 ```
 
 ## License
