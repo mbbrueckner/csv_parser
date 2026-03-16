@@ -579,6 +579,20 @@ public:
 
     m_data.push_back(std::move(values));
 }
+/**
+ * @brief Removes the row at zero-based index @p row.
+ *
+ * @param row Zero-based row index.
+ * @throws std::out_of_range if @p row >= rowCount().
+ */
+void removeRow(size_t row) {
+    if (row >= m_data.size())
+        throw std::out_of_range(
+            "removeRow: index " + std::to_string(row) +
+            " out of range (rowCount=" + std::to_string(m_data.size()) + ")");
+
+    m_data.erase(m_data.begin() + row);
+}
 }; // class Document
 
 } // namespace csv
