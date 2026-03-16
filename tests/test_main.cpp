@@ -358,3 +358,30 @@ TEST_CASE("fromFile: Windows line endings (CRLF) are handled", "[csv_parser][whi
     REQUIRE(std::get<std::string>(doc.data()[0][1]) == "Alice");
     REQUIRE(std::get<std::string>(doc.data()[1][1]) == "Bob");
 }
+
+TEST_CASE("fromFile: 1 and 0 are voted as INT not BOOL", "[csv_parser][schema]") {
+    {
+        std::ofstream out("bool_vs_int.csv");
+        out << "1\n0\n1";
+    }
+
+    auto doc = csv::Document::fromFile("bool_vs_int.csv");
+
+    REQUIRE(doc.rowCount() == 3);
+    REQUIRE(std::holds_alternative<long>(doc.data()[0][0]));
+    REQUIRE(std::get<long>(doc.data()[0][0]) == 1);
+}
+
+TEST_CASE("fromFile: yes/no column is voted as BOOL", "[csv_parser][schema]") {
+    {
+        std::ofstream out("bool_yes_no.csv");
+        out << "yes\nno\nyes";
+    }
+
+    auto doc = csv::Document::fromFile("bool_yes_no.csv");
+
+    REQUIRE(doc.rowCount() == 3);
+    REQUIRE(std::holds_alternative<bool>(doc.data()[0][0]));
+    REQUIRE(std::get<bool>(doc.data()[0][0]) == true);
+    REQUIRE(std::get<bool>(doc.data()[1][0]) == false);
+}

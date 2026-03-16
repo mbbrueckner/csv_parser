@@ -164,20 +164,19 @@ private:
   static bool isBoolean(const std::string &s) {
     std::string lower = s;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-    return (lower == "true" || lower == "false" || lower == "1" ||
-            lower == "0" || lower == "yes" || lower == "no");
+    return (lower == "true" || lower == "false" || lower == "yes" || lower == "no");
   }
 
   /**
    * @brief Converts a boolean-like string to a `bool`.
    *
    * @param s The string to convert (case-insensitive).
-   * @return  @c true for `"true"`, `"1"`, or `"yes"`; @c false otherwise.
+   * @return  @c true for `"true"`or `"yes"`; @c false otherwise.
    */
   static bool stringToBool(const std::string &s) {
     std::string lower = s;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-    if (lower == "true" || lower == "1" || lower == "yes")
+    if (lower == "true" || lower == "yes")
       return true;
     return false;
   }
