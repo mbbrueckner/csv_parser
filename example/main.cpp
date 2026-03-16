@@ -56,7 +56,7 @@ int main() {
               << " (" << bestAvg << ")\n";
 
     // write back
-    doc.toFile("../examples/grades_out.csv");
+    doc.toFile("../example/grades_out.csv");
     std::cout << "\nResults written to grades_out.csv\n";
 
     return 0;
