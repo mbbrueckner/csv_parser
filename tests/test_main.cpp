@@ -384,3 +384,117 @@ TEST_CASE("fromFile: yes/no column is voted as BOOL", "[csv_parser][schema]") {
     REQUIRE(std::get<bool>(doc.data()[0][0]) == true);
     REQUIRE(std::get<bool>(doc.data()[1][0]) == false);
 }
+
+TEST_CASE("addRow: appends row with correct values", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name", "age"});
+    doc.addRow({std::string("Alice"), 30L});
+
+    REQUIRE(doc.rowCount() == 1);
+    REQUIRE(std::get<std::string>(doc.data()[0][0]) == "Alice");
+    REQUIRE(std::get<long>(doc.data()[0][1]) == 30);
+}
+
+TEST_CASE("addRow: missing cells filled with monostate", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name", "age", "score"});
+    doc.addRow({std::string("Alice")});  
+
+    REQUIRE(doc.rowCount() == 1);
+    REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][1]));
+    REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][2]));
+}
+
+TEST_CASE("addRow: throws on too many values", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    doc.addRow({std::string("Alice")});  
+
+    REQUIRE_THROWS_AS(
+        doc.addRow({std::string("Bob"), 99L}),
+        std::invalid_argument);
+}
+
+TEST_CASE("removeRow: removes correct row", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    doc.addRow({std::string("Alice")});
+    doc.addRow({std::string("Bob")});
+    doc.addRow({std::string("Charlie")});
+
+    doc.removeRow(1);  
+
+    REQUIRE(doc.rowCount() == 2);
+    REQUIRE(std::get<std::string>(doc.data()[0][0]) == "Alice");
+    REQUIRE(std::get<std::string>(doc.data()[1][0]) == "Charlie");
+}
+
+TEST_CASE("removeRow: throws on invalid index", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    doc.addRow({std::string("Alice")});
+
+    REQUIRE_THROWS_AS(doc.removeRow(99), std::out_of_range);
+}
+
+TEST_CASE("addColumn: appends column with values", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    doc.addRow({std::string("Alice")});
+    doc.addRow({std::string("Bob")});
+
+    doc.addColumn("age", csv::DType::INT, {30L, 25L});
+
+    REQUIRE(doc.columnNames().size() == 2);
+    REQUIRE(doc.columnNames()[1] == "age");
+    REQUIRE(std::get<long>(doc.data()[0][1]) == 30);
+    REQUIRE(std::get<long>(doc.data()[1][1]) == 25);
+}
+
+TEST_CASE("addColumn: default fills with monostate", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    doc.addRow({std::string("Alice")});
+    doc.addRow({std::string("Bob")});
+
+    doc.addColumn("score", csv::DType::DOUBLE);
+
+    REQUIRE(std::holds_alternative<std::monostate>(doc.data()[0][1]));
+    REQUIRE(std::holds_alternative<std::monostate>(doc.data()[1][1]));
+}
+
+TEST_CASE("addColumn: throws on wrong values size", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    doc.addRow({std::string("Alice")});
+
+    REQUIRE_THROWS_AS(
+        doc.addColumn("age", csv::DType::INT, {30L, 25L}),  // 2 Werte, 1 Zeile
+        std::invalid_argument);
+}
+
+TEST_CASE("removeColumn: removes by index", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name", "age", "score"});
+    doc.addRow({std::string("Alice"), 30L, 9.5});
+
+    doc.removeColumn(1);  // age entfernen
+
+    REQUIRE(doc.columnNames().size() == 2);
+    REQUIRE(doc.columnNames()[0] == "name");
+    REQUIRE(doc.columnNames()[1] == "score");
+    REQUIRE(doc.data()[0].size() == 2);
+}
+
+TEST_CASE("removeColumn: removes by name", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name", "age"});
+    doc.addRow({std::string("Alice"), 30L});
+
+    doc.removeColumn("age");
+
+    REQUIRE(doc.columnNames().size() == 1);
+    REQUIRE(doc.columnNames()[0] == "name");
+}
+
+TEST_CASE("removeColumn: throws on invalid index", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    doc.addRow({std::string("Alice")});
+
+    REQUIRE_THROWS_AS(doc.removeColumn(99), std::out_of_range);
+}
+
+TEST_CASE("removeColumn: throws on unknown name", "[csv_parser][mutation]") {
+    csv::Document doc(',', {"name"});
+    REQUIRE_THROWS_AS(doc.removeColumn("nonexistent"), std::out_of_range);
+}
