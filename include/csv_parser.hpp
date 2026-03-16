@@ -243,6 +243,7 @@ public:
    * - `size()` to query the number of rows.
    *
    * @note The `Document` that produced this view must outlive it.
+   * @note ColumnView is intentionally read-only. To modify data, use addRow(), removeRow(), addColumn(), removeColumn().
    */
   class ColumnView {
     const std::vector<std::vector<CellValue>> *m_data;
