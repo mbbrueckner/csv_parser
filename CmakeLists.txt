@@ -24,3 +24,11 @@ target_link_libraries(unit_tests
         csv_parser 
         Catch2::Catch2WithMain
 )
+# add example execuatble
+add_executable(example example/main.cpp)
+
+# link example and csv_parser
+target_link_libraries(example
+ PRIVATE 
+        csv_parser 
+)
