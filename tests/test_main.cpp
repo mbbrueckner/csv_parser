@@ -201,7 +201,11 @@ TEST_CASE("toFile: header is written as first line", "[csv_parser][header][toFil
 
 
 TEST_CASE("ColumnView: access column by index", "[csv_parser][ColumnView]") {
-  auto doc = csv::Document::fromFile("schema_mixed.csv", ',', 100,
+  {
+      std::ofstream out("cv_by_index.csv");
+      out << "Alice,30,1.75\nBob,25,1.80";
+  }
+  auto doc = csv::Document::fromFile("cv_by_index.csv", ',', 100,
       {csv::DType::STRING, csv::DType::INT, csv::DType::DOUBLE});
 
   auto col = doc[1]; // Age column
@@ -242,18 +246,30 @@ TEST_CASE("ColumnView: range-for iteration", "[csv_parser][ColumnView]") {
 }
 
 TEST_CASE("ColumnView: operator[] throws out_of_range for bad row", "[csv_parser][ColumnView]") {
-  auto doc = csv::Document::fromFile("cv_iter.csv", ',', 100, {}, true);
+  {
+      std::ofstream out("cv_throw_row.csv");
+      out << "val\n1\n2\n3";
+  }
+  auto doc = csv::Document::fromFile("cv_throw_row.csv", ',', 100, {}, true);
   auto col = doc[0];
   REQUIRE_THROWS_AS(col[999], std::out_of_range);
 }
 
 TEST_CASE("ColumnView: operator[](size_t) throws for bad column index", "[csv_parser][ColumnView]") {
-  auto doc = csv::Document::fromFile("cv_iter.csv", ',', 100, {}, true);
+  {
+      std::ofstream out("cv_throw_col.csv");
+      out << "val\n1\n2\n3";
+  }
+  auto doc = csv::Document::fromFile("cv_throw_col.csv", ',', 100, {}, true);
   REQUIRE_THROWS_AS(doc[99], std::out_of_range);
 }
 
 TEST_CASE("ColumnView: operator[](string) throws for unknown column name", "[csv_parser][ColumnView]") {
-  auto doc = csv::Document::fromFile("cv_named.csv", ',', 100, {}, true);
+  {
+      std::ofstream out("cv_throw_name.csv");
+      out << "name,score\nAlice,9.5\nBob,8.0";
+  }
+  auto doc = csv::Document::fromFile("cv_throw_name.csv", ',', 100, {}, true);
   REQUIRE_THROWS_AS(doc["nonexistent"], std::out_of_range);
 }
 
