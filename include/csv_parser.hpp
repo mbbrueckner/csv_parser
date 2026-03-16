@@ -553,6 +553,32 @@ public:
       file << '\n';
     }
   }
+
+  /**
+ * @brief Appends a new row to the document.
+ *
+ * If @p values contains fewer elements than the number of columns,
+ * the missing cells are filled with @c std::monostate.
+ *
+ * @param values Cell values for the new row.
+ * @throws std::invalid_argument if @p values contains more elements
+ *         than the number of columns (only when data is non-empty).
+ */
+  void addRow(std::vector<CellValue> values) {
+    size_t numCols = m_data.empty() ? values.size()
+                                    : m_data[0].size();
+
+    if (values.size() > numCols)
+        throw std::invalid_argument(
+            "addRow: too many values (" + std::to_string(values.size()) +
+            ") for " + std::to_string(numCols) + " columns");
+
+    // fill missing cells with monostate
+    while (values.size() < numCols)
+        values.push_back(std::monostate{});
+
+    m_data.push_back(std::move(values));
+}
 }; // class Document
 
 } // namespace csv
